@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from job_fetcher import process_and_store_jobs, get_new_job_ids
 from discord_notifier import discord_post
 from channels_handling import load_categories
+from logger_config import log
 
 load_dotenv()
 
@@ -23,7 +24,7 @@ async def process_category(category_name, channel_id):
     print(f"\n--- Processing Category: {category_name} ---")
     try:
         # 1. Fetch latest jobs and store in database (Scraping part)
-        process_and_store_jobs(f"{category_name} Developer", 3)
+        process_and_store_jobs(f"{category_name} Developer", 1)
 
         # 2. Retrieve Job IDs that are new and not yet posted to Discord
         new_job_ids = get_new_job_ids(category=category_name)
@@ -32,20 +33,19 @@ async def process_category(category_name, channel_id):
             print(f"✅  Info: No new {category_name} jobs found at this time.")
             return
 
-        print(f"✅  Success: Found {len(new_job_ids)} new jobs for {category_name}. Sending to Discord...")
+        log.info(f"✅  Success: Found {len(new_job_ids)} new jobs for {category_name}. Sending to Discord...")
 
         # 3. Post each new job to its respective Discord channel
         for job_id in new_job_ids:
             try:
                 await discord_post(channel_id=int(channel_id), job_id=job_id)
             except Exception as e:
-                print(f"❌  Error: Failed to post job {job_id} for {category_name}: {e}")
+                log.error(f"❌  Error: Failed to post job {job_id} for {category_name}: {e}")
 
-        print(f"✅  Posted latest {len(new_job_ids)} jobs for {category_name}.")
-        print(f"✅  Discord posting completed for {category_name}.")
+        log.info(f"✅  Posted latest {len(new_job_ids)} jobs for {category_name}.")
 
     except Exception as e:
-        print(f"❌  Exception in {category_name} process: {e}")
+        log.error(f"❌  Exception in {category_name} process: {e}")
 
 
 # Background loop — runs all categories concurrently every 10 seconds
@@ -71,9 +71,9 @@ async def job_monitor():
                 await asyncio.gather(*tasks)
 
         except Exception as e:
-            print(f"❌  Critical System Error: {e}")
+            log.error(f"❌  System Error: {e}")
 
-        print(f"\n--- Batch Completed in {round(time.time() - start_time, 2)}s. ---\n")
+        log.info(f"--- Batch Completed in {round(time.time() - start_time, 2)}s. ---\n")
         print("Waiting 10 Seconds for the next cycle...\n")
         await asyncio.sleep(10)
 
@@ -81,7 +81,7 @@ async def job_monitor():
 # Bot ready event
 @bot.event
 async def on_ready():
-    print(f"✅  Bot connected as {bot.user}")
+    log.info(f"\n\n✅  Bot connected as {bot.user} \n")
 
 
 # Load extensions and start bot
@@ -95,7 +95,7 @@ async def main():
 
         token = os.getenv("DISCORD_TOKEN")
         if not token:
-            print("❌  Error: DISCORD_TOKEN missing from .env file.")
+            log.error("❌  Error: DISCORD_TOKEN missing from .env file.")
             return
 
         await bot.start(token)

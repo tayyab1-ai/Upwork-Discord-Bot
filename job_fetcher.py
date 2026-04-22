@@ -7,6 +7,7 @@ from curl_cffi import requests
 from dotenv import load_dotenv
 from auth_manager import update_cookies_and_headers_in_env
 from database_setup import get_connection, save_job
+from logger_config import log
 
 
 # Fetch Jobs Function
@@ -113,7 +114,7 @@ def fetch_upwork_jobs(query, count):
                 }
     
                 formatted_jobs.append(job_dict)
-            print(f"✅ Successfully fetched {len(formatted_jobs)} jobs.")
+            print(f"✅  Successfully fetched {len(formatted_jobs)} jobs for query '{query}'.")
     
             return {
                 "status": "success",
@@ -169,7 +170,7 @@ def job_exists(job_id):
     conn.close()
 
     if result is not None:
-        print(f"⚠️ Job with ID {job_id} already exists in the database. Skipping.")
+        print(f"⚠️  Job with ID {job_id} already exists in the database. Skipping.")
         return True
     
     return False
@@ -209,16 +210,16 @@ def process_and_store_jobs(query, count):
 
             # 3. Store the cleaned dictionary directly into the database 
             save_job(job)
-            print(f"✅ Stored New Job: {job['title']}")
+            log.info(f"✅  Stored New Job: {job['title']}")
             new_jobs_count += 1
         
         print(f"💬 Total {new_jobs_count} new jobs data cleaned and added to DB.")
 
     else:
         if result["code"] == 403:
-            print("⚠️  Access Denied. 403 - Cloudflare detected. }")
+            log.warning("⚠️  Access Denied. 403 - Cloudflare detected. }")
         else:
-            print(f"⚠️  Error fetching jobs: {result.get('message')}")
+            log.error(f"⚠️  Error fetching jobs: {result.get('message')}")
 
         # Wait before retrying to avoid rapid requests
         print("\nWaiting before retrying (2-5 seconds)...\n")
@@ -228,7 +229,7 @@ def process_and_store_jobs(query, count):
         update_cookies_and_headers_in_env()
 
         # Retry fetching jobs after updating headers and cookies
-        print("Retrying fetch after updating...\n")
+        log.info("Retrying fetch after updating...\n")
         process_and_store_jobs(query, count)
 
 

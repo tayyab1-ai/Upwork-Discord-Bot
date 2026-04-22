@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from datetime import datetime
+from logger_config import log
 
 # Configuration
 DB_PATH = "jobs_detail.db"
@@ -79,5 +80,5 @@ def save_job(job_data):
 """
 # Initialize Database
 create_tables()
-print("✅ Database initialized and tables created.")
+log.info("✅ Database initialized and tables created.")
 """

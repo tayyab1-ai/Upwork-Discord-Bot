@@ -11,3 +11,6 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+
+# Ignore log files
+*.log

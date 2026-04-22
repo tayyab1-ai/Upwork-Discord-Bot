@@ -2,6 +2,7 @@ import time
 import json
 import re
 import undetected_chromedriver as uc
+from logger_config import log
 
 def fetch_cookies_and_headers():
     options = uc.ChromeOptions()
@@ -76,19 +77,19 @@ def fetch_cookies_and_headers():
 
         # Status Reporting
         if len(cookies_dict) > 3:
-            print(f"✅ Success: {len(cookies_dict)} cookies collected.")
+            log.info(f"✅ Success: {len(cookies_dict)} cookies collected.")
         else:
-            print(f"⚠️ Warning: Only {len(cookies_dict)} cookies found. Headless mode might be restricted.")
+            log.warning(f"⚠️ Warning: Only {len(cookies_dict)} cookies found. Headless mode might be restricted.")
 
         if "authorization" in headers_dict:
-            print("✅ Success: Authorization token extracted.")
+            log.info("✅ Success: Authorization token extracted.")
         else:
-            print("⚠️ Warning: Authorization header not found. Cloudflare might have blocked the search.")
+            log.warning("⚠️ Warning: Authorization header not found. Cloudflare might have blocked the search.")
 
         return cookies_dict, headers_dict
 
     except Exception as e:
-        print(f"❌ Error during execution: {e}")
+        log.error(f"❌ Error during execution: {e}")
         return {}, {}
     finally:
         if driver:
@@ -105,7 +106,7 @@ def update_cookies_and_headers_in_env():
 
     # Guard: abort if we got nothing useful 
     if not new_cookies and not new_headers:
-        print("⚠️  Error: Both cookies and headers are empty. Aborting .env update.")
+        log.warning("⚠️  Error: Both cookies and headers are empty. env not updated.")
         return
 
     # Read current .env content
@@ -125,9 +126,9 @@ def update_cookies_and_headers_in_env():
         else:
             content += f"\nUPWORK_COOKIES='{cookie_str}'"
 
-        print(f"✅  Cookies updated in .env ({len(new_cookies)} entries).")
+        log.info(f"✅  Cookies updated in .env ({len(new_cookies)} entries).")
     else:
-        print("⚠️  Warning: Skipping UPWORK_COOKIES update — no cookies were fetched.")
+        log.warning("⚠️  Warning: Skipping UPWORK_COOKIES update — no cookies were fetched.")
 
     # Update UPWORK_HEADERS (only authorization + user-agent)
     if new_headers:
@@ -162,9 +163,9 @@ def update_cookies_and_headers_in_env():
         else:
             content += f"\n{new_header_line}"
 
-        print("✅  Headers updated in .env (authorization + user-agent only).")
+        log.info("✅  Headers updated in .env (authorization + user-agent only).")
     else:
-        print("⚠️  Warning: Skipping UPWORK_HEADERS update — no headers were fetched.")
+        log.warning("⚠️  Warning: Skipping UPWORK_HEADERS update — no headers were fetched.")
 
     # Write updated content back
     with open(".env", "w") as f:
@@ -172,7 +173,7 @@ def update_cookies_and_headers_in_env():
 
     # print("✅  New Cookies: ", new_cookies)
     # print("✅  New Headers: ", new_headers)
-    print("✅  Success: .env file updated with fresh cookies and headers.")
+    log.info("✅  Success: .env file updated with fresh cookies and headers.")
 
 
 """

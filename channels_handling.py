@@ -4,6 +4,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from logger_config import log
 
 load_dotenv()
 
@@ -19,7 +20,7 @@ def load_categories() -> dict:
         try:
             return json.load(f)
         except json.JSONDecodeError:
-            print(f"⚠️  Warning: {CATEGORIES_FILE} is corrupted. Returning empty categories.")
+            log.warning(f"⚠️  Warning: {CATEGORIES_FILE} is corrupted. Returning empty categories.")
             return {}
 
 
@@ -27,6 +28,7 @@ def load_categories() -> dict:
 def save_categories(data: dict):
     with open(CATEGORIES_FILE, "w") as f:
         json.dump(data, f, indent=4)
+    log.info(f"✅  Categories saved to {CATEGORIES_FILE}. Current categories: {list(data.keys())}")
 
 
 # Class Handles all Discord commands for dynamic channel management.
@@ -38,11 +40,13 @@ class ChannelsHandler(commands.Cog):
     # !add channel <name>
     @commands.command(name="add")
     async def add_channel(self, ctx, subcommand: str, *, category_name: str):
+        log.info(f"User {ctx.author} issued command: !add {subcommand} {category_name}")
         # Only handle "channel" subcommand
         if subcommand.lower() != "channel":
             await ctx.send(
                 f"⚠️  Unknown subcommand `{subcommand}`. Usage: `!add channel <name>`"
             )
+            log.warning(f"⚠️  User {ctx.author} attempted unknown subcommand '{subcommand}' in !add command.")
             return
 
         # Normalize category name for consistent storage and lookup
@@ -57,6 +61,7 @@ class ChannelsHandler(commands.Cog):
             await ctx.send(
                 f"⚠️  Category **{category_key}** already exists → <#{data[category_key]}>"
             )
+            log.warning(f"⚠️  User {ctx.author} attempted to add existing category '{category_key}'.")
             return
 
         # Create the Discord text channel
@@ -67,22 +72,26 @@ class ChannelsHandler(commands.Cog):
                 "❌ Error: Bot does not have **Manage Channels** permission. "
                 "Grant this permission in Server Settings and try again."
             )
+            log.error(f"❌  Permission Error: Bot lacks Manage Channels permission to create channel for '{category_key}'.")
             return
         except discord.HTTPException as e:
             await ctx.send(f"❌ Discord error while creating channel: {e}")
+            log.error(f"❌  Discord Error: Failed to create channel for '{category_key}': {e}")
             return
         except Exception as e:
             await ctx.send(f"❌ Unexpected error: {e}")
+            log.error(f"❌  Unexpected Error: Failed to create channel for '{category_key}': {e}")
             return
 
         # Save new entry to JSON after successful channel creation
         data[category_key] = str(new_channel.id)
         save_categories(data)
 
-        print(f"✅  Category '{category_key}' added → channel '{channel_slug}-jobs' (ID: {new_channel.id})")
+        log.info(f"✅  Category '{category_key}' added → channel '{channel_slug}-jobs' (ID: {new_channel.id})")
         await ctx.send(
             f"✅ Category **{category_key}** added and channel <#{new_channel.id}> created!"
         )
+        log.info(f"✅  User {ctx.author} successfully added category '{category_key}' with channel ID {new_channel.id}.")
 
     # !delete channel <name>
     @commands.command(name="delete")
@@ -90,6 +99,7 @@ class ChannelsHandler(commands.Cog):
         # 1. Subcommand check
         if subcommand.lower() != "channel":
             await ctx.send(f"⚠️ Unknown subcommand `{subcommand}`. Usage: `!delete channel <name>`")
+            log.warning(f"⚠️  User {ctx.author} attempted unknown subcommand '{subcommand}' in !delete command.")
             return
 
         category_key = category_name.strip().title()
@@ -98,6 +108,7 @@ class ChannelsHandler(commands.Cog):
         # 2. Check if category exists in JSON
         if category_key not in data:
             await ctx.send(f"❌ Error: Category **{category_key}** record not found, available categories: {', '.join(data.keys())}")
+            log.warning(f"❌  User {ctx.author} attempted to delete non-existent category '{category_key}'. Available categories: {', '.join(data.keys())}")
             return
 
         stored_channel_id = int(data[category_key])
@@ -108,6 +119,7 @@ class ChannelsHandler(commands.Cog):
             await ctx.send(
                 f"❌ Security Block: You can only delete the category from its own channel. Please run this command in <#{stored_channel_id}>."
             )
+            log.warning(f"❌  Security Block: User {ctx.author} attempted to delete category '{category_key}' from channel ID {current_channel_id} instead of its own channel ID {stored_channel_id}.")
             return
 
         channel_to_delete = self.bot.get_channel(stored_channel_id)
@@ -117,24 +129,26 @@ class ChannelsHandler(commands.Cog):
             # If channel is already deleted (e.g., manually by admin), we should still remove the JSON record without error
             if channel_to_delete:
                 await ctx.send(f"🗑️ Deleting channel for **{category_key}** in 3 seconds...")
-                await asyncio.sleep(3) # Thora wait taake message dikh jaye
+                await asyncio.sleep(3)
                 await channel_to_delete.delete()
             else:
-                print(f"⚠️ Discord channel already missing for {category_key}, just cleaning JSON.")
+                log.warning(f"⚠️ Discord channel already missing for {category_key}, just cleaning JSON.")
 
             # 5. JSON Update : Remove the category record from JSON file
             del data[category_key]
             save_categories(data)
-            
-            print(f"✅ Category '{category_key}' and its record removed successfully.")
-            # Note: ctx.send don't work after channel deletion, so we won't send a confirmation message in Discord.
+
+            log.info(f"✅ Category '{category_key}' and its record removed successfully.")
 
         except discord.Forbidden:
             await ctx.send("❌ Error: Bot does not have **Manage Channels** permission.")
+            log.error(f"❌  Permission Error: Bot lacks Manage Channels permission to delete channel for '{category_key}'.")
         except discord.HTTPException as e:
             await ctx.send(f"❌ Discord error: {e}")
+            log.error(f"❌  Discord Error: Failed to delete channel for '{category_key}': {e}")
         except Exception as e:
             await ctx.send(f"❌ Unexpected error: {e}")
+            log.error(f"❌  Unexpected Error: Failed to delete channel for '{category_key}': {e}")
 
     # !list channels
     @commands.command(name="list")
@@ -143,6 +157,7 @@ class ChannelsHandler(commands.Cog):
             await ctx.send(
                 f"⚠️  Unknown subcommand `{subcommand}`. Usage: `!list channels`"
             )
+            log.warning(f"⚠️  User {ctx.author} attempted unknown subcommand '{subcommand}' in !list command.")
             return
 
         data = load_categories()
@@ -150,6 +165,7 @@ class ChannelsHandler(commands.Cog):
             await ctx.send(
                 "⚠️  No categories found. Use `!add channel <name>` to add one."
             )
+            log.info(f"⚠️  User {ctx.author} requested category list but no categories found.")
             return
 
         lines = [f"• **{name}** → <#{cid}>" for name, cid in data.items()]
@@ -169,12 +185,12 @@ class ChannelsHandler(commands.Cog):
                 f"Usage: `!add channel <name>` or `!delete channel <name>`"
             )
         elif isinstance(error, commands.CommandNotFound):
-            pass  # Silently ignore unknown commands — no spam
+            await ctx.send("⚠️  Unknown command. Available commands: `!add channel`, `!delete channel`, `!list channels`")
         elif isinstance(error, commands.BadArgument):
             await ctx.send("⚠️  Invalid argument. Please check command usage.")
         else:
             await ctx.send(f"❌ An error occurred: {error}")
-            print(f"❌  Command error in '{ctx.command}': {error}")
+            log.error(f"❌  Command error in '{ctx.command}': {error}")
 
 
 # Required by discord.py for load_extension() in main.py

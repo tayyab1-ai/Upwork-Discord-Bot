@@ -7,6 +7,7 @@ import re
 from discord.ext import commands
 from dotenv import load_dotenv
 from datetime import datetime, timezone
+from logger_config import log
 
 # Intents setup for message reading and guild access
 intents = discord.Intents.default()
@@ -201,22 +202,22 @@ def build_job_embed(job: sqlite3.Row) -> discord.Embed:
 # Main processing function to fetch job details and post to Discord
 async def post_job_to_discord(bot: discord.Client, channel_id: int, job_id: str) -> bool:
     """Fetches job from DB and posts it to the specified channel."""
-    print(f"---Fetching job '{job_id}' from database...")
+    log.info(f"---Fetching job '{job_id}' from database...")
 
     try:
         conn = get_connection()
         row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
         conn.close()
     except Exception as e:
-        print(f"❌ Error reading database: {e}")
+        log.error(f"❌ Error reading database: {e}")
         return False
 
     if not row:
-        print(f"⚠️ Warning: Job '{job_id}' not found.")
+        log.warning(f"⚠️ Warning: Job '{job_id}' not found.")
         return False
 
     channel = bot.get_channel(channel_id) or await bot.fetch_channel(channel_id)
-    print(f"--- Found channel: {channel.name} ---")
+    log.info(f"--- Found channel: {channel.name} ---")
     try:
         embed = build_job_embed(row)
         message = await channel.send(embed=embed)
@@ -226,10 +227,10 @@ async def post_job_to_discord(bot: discord.Client, channel_id: int, job_id: str)
         conn.commit()
         conn.close()
 
-        print(f"✅ Success: Posted to {channel_id}. Message ID: {message.id}")
+        log.info(f"✅ Success: Posted to {channel_id}. Message ID: {message.id}")
         return True
     except Exception as e:
-        print(f"❌ Error during posting: {e}")
+        log.error(f"❌ Error during posting: {e}")
         return False
 
 
@@ -240,11 +241,11 @@ async def discord_post(channel_id: int, job_id: str):
 
     @bot_client.event
     async def on_ready():
-        print(f"✅  --- Bot Connected as {bot_client.user} ---")
+        log.info(f"✅  --- Bot Connected as {bot_client.user} ---")
         try:
             await post_job_to_discord(bot_client, channel_id, job_id)
         finally:
-            print("✅  --- Task Finished. Closing connection. ---")
+            log.info("✅  --- Task Finished. Closing connection. ---")
             await bot_client.close()
             await asyncio.sleep(1)  # Ensure clean shutdown
 
@@ -252,8 +253,8 @@ async def discord_post(channel_id: int, job_id: str):
     if token:
         await bot_client.start(token)
     else:
-        print("❌ Error: DISCORD_TOKEN missing.")
-    print("✅  --- Bot Disconnected ---\n")
+        log.error("❌ Error: DISCORD_TOKEN missing.")
+    log.info("✅  --- Bot Disconnected ---\n")
 
 
 """
