@@ -28,7 +28,7 @@ def fetch_upwork_jobs(query, count):
         'variables': {
             'requestVariables': {
                 'userQuery': query,
-                'sort': 'RECENCY',
+                'sort': 'recency',
                 'highlight': True,
                 'paging': {
                     'offset': 0,
@@ -207,6 +207,7 @@ def process_and_store_jobs(query, count):
             job['hourly_max'] = job.get('hourly_max') if job.get('hourly_max') is not None else 0.0
             job['tier'] = job.get('tier') if job.get('tier') is not None else 0
             job['url'] = job.get('url') if job.get('url') is not None else ""
+            job['category'] = query
 
             # 3. Store the cleaned dictionary directly into the database 
             save_job(job)
@@ -237,7 +238,7 @@ def process_and_store_jobs(query, count):
 def get_new_job_ids(category):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT job_id FROM jobs WHERE discord_posted = 0 AND title LIKE ?", (f"%{category}%",))
+    cursor.execute("SELECT job_id FROM jobs WHERE discord_posted = 0 AND category = ?", (category,))
     new_job_ids = [row[0] for row in cursor.fetchall()]
     conn.close()
     print(f"🔍 Found {len(new_job_ids)} jobs for {category} not yet posted to Discord.")

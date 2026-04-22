@@ -23,6 +23,7 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_id TEXT NOT NULL UNIQUE,
+            category TEXT,
             title TEXT NOT NULL,
             description TEXT,
             url TEXT,
@@ -50,12 +51,13 @@ def save_job(job_data):
     try:
         cursor.execute("""
             INSERT OR IGNORE INTO jobs (
-                job_id, title, description, url, job_type, budget_amount, 
+                job_id, category, title, description, url, job_type, budget_amount, 
                 hourly_min, hourly_max, contractor_tier, duration, 
                 skills, published_time, created_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             job_data.get('id'),
+            job_data.get('category'),
             job_data.get('title'),
             job_data.get('description'),
             job_data.get('url'),

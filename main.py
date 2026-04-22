@@ -24,7 +24,7 @@ async def process_category(category_name, channel_id):
     print(f"\n--- Processing Category: {category_name} ---")
     try:
         # 1. Fetch latest jobs and store in database (Scraping part)
-        process_and_store_jobs(f"{category_name} Developer", 1)
+        process_and_store_jobs(f"{category_name}", 1)
 
         # 2. Retrieve Job IDs that are new and not yet posted to Discord
         new_job_ids = get_new_job_ids(category=category_name)
