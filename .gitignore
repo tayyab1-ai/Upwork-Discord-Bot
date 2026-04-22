@@ -1,0 +1,13 @@
+# Ignore Environment Variables
+.env
+
+# Ignore any local environment files
+.env.local
+.env.*.local
+
+# Python specific ignores (agar aap Python use kar rahay hain)
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
