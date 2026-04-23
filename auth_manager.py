@@ -52,6 +52,29 @@ def fetch_cookies_and_headers():
         logs = driver.get_log("performance")
         headers_dict = {}
 
+
+        """
+        logs = { list of entries }
+        Each entry looks like:
+        entry = {
+            "message": '{"message": {"method": "Network.requestWillBeSent", "params": {...}}}',
+            "timestamp": 1234567890,
+            "level": "INFO"
+        }
+        Each Message Dict looks like:
+        {
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "request": {
+                    "url": "https://www.upwork.com/api/graphql/v1",
+                    "headers": {
+                        "Authorization": "Bearer eyJhbGc...",
+                        "User-Agent": "Mozilla/5.0..."
+                    }
+                }
+            }
+        }
+        """
         print("Analyzing network logs for Authorization token...")
         for entry in logs:
             try:
@@ -175,6 +198,13 @@ def update_cookies_and_headers_in_env():
     # print("✅  New Headers: ", new_headers)
     log.info("✅  Success: .env file updated with fresh cookies and headers.")
 
+
+"""
+# TESTING FETCH FUNCTION 
+cookies, headers = fetch_cookies_and_headers()
+print("Fetched Cookies:", cookies)
+print("Fetched Headers:", headers)
+"""
 
 """
 # TESTING UPDATE BOTH COOKIES AND HEADERS TOGETHER

@@ -11,7 +11,8 @@ from logger_config import log
 
 
 # Fetch Jobs Function
-def fetch_upwork_jobs(query, count):
+def fetch_upwork_jobs(query, count=1):
+    # request URL for Upwork's GraphQL API endpoint
     url = "https://www.upwork.com/api/graphql/v1"
 
     # Load environment variables from .env file
@@ -217,10 +218,7 @@ def process_and_store_jobs(query, count):
         print(f"💬 Total {new_jobs_count} new jobs data cleaned and added to DB.")
 
     else:
-        if result["code"] == 403:
-            log.warning("⚠️  Access Denied. 403 - Cloudflare detected. }")
-        else:
-            log.error(f"⚠️  Error fetching jobs: {result.get('message')}")
+        log.error(f"⚠️  Error fetching jobs: {result.get('message')}")
 
         # Wait before retrying to avoid rapid requests
         print("\nWaiting before retrying (2-5 seconds)...\n")

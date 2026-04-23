@@ -104,14 +104,11 @@ async def main():
 """
 # TESTING: Run a single category once without the loop
 async def test():
-    await process_category("Python", 1495486908254523482)
+    await process_category("Python", 1496465492372750498)
 
 asyncio.run(test())
 """
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Bot stopped manually by user.")
+    asyncio.run(main())
