@@ -27,7 +27,7 @@ def fetch_cookies_and_headers():
     driver = None
     try:
         print("Starting headless browser...")
-        driver = uc.Chrome(options=options)
+        driver = uc.Chrome(options=options, version_main=147)
 
         # Step 1: Visit the home page first. 
         # Directly hitting search results in headless mode is a major "bot" red flag.

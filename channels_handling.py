@@ -196,18 +196,3 @@ class ChannelsHandler(commands.Cog):
 # Required by discord.py for load_extension() in main.py
 async def setup(bot):
     await bot.add_cog(ChannelsHandler(bot))
-
-
-"""
-# TESTING BLOCK
-# Run standalone to verify load/save functions work correctly
-
-# Test load
-cats = load_categories()
-print("Current categories:", cats)
-
-# Test save
-# cats["TestCategory"] = "123456789"
-# save_categories(cats)
-# print("Saved:", load_categories())
-"""

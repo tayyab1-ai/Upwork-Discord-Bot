@@ -196,7 +196,7 @@ def process_and_store_jobs(query, count):
                 continue
 
             # 2. Data Cleaning for title and description
-            job['title'] = clean_text(job.get('title'))
+            job['title'] = clean_text(job.get('title')) 
             job['description'] = clean_text(job.get('description'))
             job['skills'] = clean_text(job.get('skills')) 
             job['duration'] = clean_text(job.get('duration'))
@@ -247,7 +247,16 @@ def get_new_job_ids(category):
 def testing(query, count):
     result = fetch_upwork_jobs(query, count)
     print(f"--- Showing {len(result['jobs'])} Jobs --- \n\n")
-    
+
+    # Display Raw Data
+    print("--- Raw Data from API ---\n")
+    for job in result["jobs"]:
+        print(f"🔹 Raw Title: {job.get('title')}")
+        print(f"🔹 Raw Description: {job.get('description')}")
+        print(f"🔹 Raw Posted Time: {job.get('published_time')}")
+        print(f"🔹 Raw URL: {job.get('url')}")
+        print("-" * 30)
+
     # Display Cleaned Data
     print("\n--- Processing Cleaned Data ---\n")
     for job in result["jobs"]:
@@ -265,7 +274,6 @@ def testing(query, count):
 # TEST FUNCTION CALL
 testing("Python", 5)
 """
-
 
 
 """
