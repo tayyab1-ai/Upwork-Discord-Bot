@@ -3,26 +3,29 @@ import re
 import json
 import time
 import random
+import hashlib
 from curl_cffi import requests
 from dotenv import load_dotenv
 from auth_manager import update_cookies_and_headers_in_env
 from database_setup import get_connection, save_job
 from logger_config import log
 
+# Create a persistent session 
+session = requests.Session()
 
-# Fetch Jobs Function
 def fetch_upwork_jobs(query, count=1):
-    # request URL for Upwork's GraphQL API endpoint
     url = "https://www.upwork.com/api/graphql/v1"
-
-    # Load environment variables from .env file
-    load_dotenv(override=True)
-    headers_raw = os.getenv('UPWORK_HEADERS', '{}')
-    cookies_raw = os.getenv('UPWORK_COOKIES', '{}')
     
-    # Convert raw JSON strings from environment variables to Python dictionaries
-    headers = json.loads(headers_raw)
-    cookies = json.loads(cookies_raw)
+    # Load headers and cookies from environment variables
+    load_dotenv(override=True)
+
+    # Save and Convert to JSON
+    headers = json.loads(os.getenv('UPWORK_HEADERS', '{}'))
+    cookies = json.loads(os.getenv('UPWORK_COOKIES', '{}'))
+
+    # Update headers and cookies in session
+    session.headers.update(headers)
+    session.cookies.update(cookies)
 
     json_data = {
         'query': '\n  query VisitorJobSearch($requestVariables: VisitorJobSearchV1Request!) {\n    search {\n      universalSearchNuxt {\n        visitorJobSearchV1(request: $requestVariables) {\n          paging {\n            total\n            offset\n            count\n          }\n          \n    facets {\n      jobType \n    {\n      key\n      value\n    }\n  \n      workload \n    {\n      key\n      value\n    }\n  \n      clientHires \n    {\n      key\n      value\n    }\n  \n      durationV3 \n    {\n      key\n      value\n    }\n  \n      amount \n    {\n      key\n      value\n    }\n  \n      contractorTier \n    {\n      key\n      value\n    }\n  \n      contractToHire \n    {\n      key\n      value\n    }\n  \n      \n    }\n  \n          results {\n            id\n            title\n            description\n            relevanceEncoded\n            ontologySkills {\n              uid\n              parentSkillUid\n              prefLabel\n              prettyName: prefLabel\n              freeText\n              highlighted\n            }\n            \n            jobTile {\n              job {\n                id\n                ciphertext: cipherText\n                jobType\n                weeklyRetainerBudget\n                hourlyBudgetMax\n                hourlyBudgetMin\n                hourlyEngagementType\n                contractorTier\n                sourcingTimestamp\n                createTime\n                publishTime\n                \n                hourlyEngagementDuration {\n                  rid\n                  label\n                  weeks\n                  mtime\n                  ctime\n                }\n                fixedPriceAmount {\n                  isoCurrencyCode\n                  amount\n                }\n                fixedPriceEngagementDuration {\n                  id\n                  rid\n                  label\n                  weeks\n                  ctime\n                  mtime\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n  ',
@@ -122,26 +125,60 @@ def fetch_upwork_jobs(query, count=1):
                 "code": 200,
                 "jobs": formatted_jobs
             }
-
-        # ⚠️ Error 403
+        
+        # ❌ Session Expired (401)
+        elif response.status_code == 401:
+            log.error("❌ Session Expired (401). Need Re-authentication.")
+            log.info("🔄 Refreshing Session and Updating Auth...")
+            update_cookies_and_headers_in_env()
+            return {
+                "status": "error",
+                "code": 401,
+                "message": "Unauthorized - Session Expired"
+            }
+        
+        # ❌ Access Denied (403)
         elif response.status_code == 403:
+            log.error("❌ Access Denied (403). Cloudflare or IP Block.")
+            log.info("🔄 Refreshing Session and Updating Auth...")
+            update_cookies_and_headers_in_env()
             return {
                 "status": "error",
                 "code": 403,
-                "message": "Access Denied - 403 Cloudflare Block."
+                "message": "Forbidden"
             }
         
-
-        # ⚠️ Other Errors
-        else:
+        # ⚠️ Rate Limit (429)
+        elif response.status_code == 429:
+            log.warning("⚠️ Rate Limit (429). Waiting for a longer period...")
+            time.sleep(60)
+            return {
+                "status": "error",
+                "code": 429,
+                "message": "Too Many Requests"
+            }
+        
+        # ⚠️ Server Error (500+)
+        elif response.status_code >= 500:
+            log.error(f"⚠️ Upwork Server Error ({response.status_code}).")
             return {
                 "status": "error",
                 "code": response.status_code,
-                "message": f"Request Failed with status code {response.status_code}."
+                "message": "Server Side Issue"
+            }
+        
+        # ❓ Unknown Error
+        else:
+            log.error(f"❓ Unknown Error: {response.status_code}")
+            return {
+                "status": "error",
+                "code": response.status_code,
+                "message": "Unexpected Error"
             }
 
-    # ⚠️ Exception Handling - Network issues, timeouts, or JSON parsing errors
+    # ⚠️ Critical Exception (like network issues, timeouts, or JSON parsing errors)
     except Exception as e:
+        log.exception(f"🔥 Critical Exception: {str(e)}")
         return {
             "status": "exception",
             "message": str(e)
@@ -160,22 +197,29 @@ def clean_text(text):
     text = " ".join(text.split())
     return text
 
-
-# Function to check if a job already exists in the database
-def job_exists(job_id):
+# Check for the job (add, update or skip)
+def job_add_update_or_skip(job_id, current_hash):
+    # Database Check (Old Hash vs New Hash)
     conn = get_connection()
     cursor = conn.cursor()
-    # Check if the job exists
-    cursor.execute("SELECT 1 FROM jobs WHERE job_id = ?", (job_id,))
-    result = cursor.fetchone()
-    conn.close()
-
-    if result is not None:
-        print(f"⚠️  Job with ID {job_id} already exists in the database. Skipping.")
-        return True
+    cursor.execute("SELECT desc_hash FROM jobs WHERE job_id = ?", (job_id,))
+    row = cursor.fetchone()
+    # Same job_id Found
+    if row:
+        old_hash = row["desc_hash"]
+        # Same job_id and description hash (Skip This Job)
+        if old_hash == current_hash:
+            print(f"⏭️  Job {job_id} found in DB with Same Description. Skipping.")
+            conn.close()
+            return True
+        else:
+            # Same ID but Different Description (Update Job) -> Delete Old Record and Re-insert New One
+            log.info(f"🔄 Job {job_id} updated. Deleting old record for re-insertion...")
+            cursor.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+            conn.commit()
     
+    conn.close()
     return False
-
 
 
 # Main function to process and store jobs in database
@@ -186,18 +230,22 @@ def process_and_store_jobs(query, count):
     # Process and store jobs if fetch was successful
     if result["status"] == "success":
         jobs_list = result["jobs"]
-        new_jobs_count = 0
 
         for job in jobs_list:
             job_id = job.get('id')
 
-            # 1. Check if job already exists in database
-            if job_exists(job_id):
+            # Get and Clean Description
+            raw_desc = job.get('description', '')
+            cleaned_desc = clean_text(raw_desc)
+            
+            # Create Hash for cleaned description
+            current_hash = hashlib.md5(cleaned_desc.encode('utf-8')).hexdigest()
+            if job_add_update_or_skip(job_id, current_hash):
                 continue
 
             # 2. Data Cleaning for title and description
             job['title'] = clean_text(job.get('title')) 
-            job['description'] = clean_text(job.get('description'))
+            job['description'] = cleaned_desc
             job['skills'] = clean_text(job.get('skills')) 
             job['duration'] = clean_text(job.get('duration'))
             job['published_time'] = clean_text(job.get('published_time'))
@@ -209,26 +257,21 @@ def process_and_store_jobs(query, count):
             job['tier'] = job.get('tier') if job.get('tier') is not None else 0
             job['url'] = job.get('url') if job.get('url') is not None else ""
             job['category'] = query
+            job['desc_hash'] = current_hash
 
             # 3. Store the cleaned dictionary directly into the database 
             save_job(job)
             log.info(f"✅  Stored New Job: {job['title']}")
-            new_jobs_count += 1
         
-        print(f"💬 Total {new_jobs_count} new jobs data cleaned and added to DB.")
+        print(f"💬 New jobs data cleaned and added to DB.")
 
     else:
-        log.error(f"⚠️  Error fetching jobs: {result.get('message')}")
-
         # Wait before retrying to avoid rapid requests
         print("\nWaiting before retrying (2-5 seconds)...\n")
         time.sleep(random.randint(2, 5))  
 
-        # Update cookies and headers
-        update_cookies_and_headers_in_env()
-
         # Retry fetching jobs after updating headers and cookies
-        log.info("Retrying fetch after updating...\n")
+        log.info("Retrying fetching jobs...\n")
         process_and_store_jobs(query, count)
 
 

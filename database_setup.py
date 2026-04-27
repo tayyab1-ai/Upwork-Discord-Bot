@@ -53,8 +53,8 @@ def save_job(job_data):
             INSERT OR IGNORE INTO jobs (
                 job_id, category, title, description, url, job_type, budget_amount, 
                 hourly_min, hourly_max, contractor_tier, duration, 
-                skills, published_time, created_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                skills, published_time, created_time, desc_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             job_data.get('id'),
             job_data.get('category'),
@@ -69,18 +69,36 @@ def save_job(job_data):
             job_data.get('duration'),
             job_data.get('skills'),
             job_data.get('published_time'),
-            job_data.get('created_time')
-        ))
+            job_data.get('created_time'),
+            job_data.get('desc_hash')
+        )
+    )
         conn.commit()
     except Exception as e:
         print(f"Database Save Error: {e}")
     finally:
         conn.close()
 
+def update_table_schema():
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Check if the column already exists or not
+        cursor.execute("ALTER TABLE jobs ADD COLUMN desc_hash TEXT")
+        conn.commit()
+        print("✅ Database updated: 'desc_hash' column added.")
+    except Exception as e:
+        # IF column already exists
+        print(f"ℹ️ Database column check: {e}")
+    finally:
+        conn.close()
 
+"""
+if __name__ == "__main__":
+    update_table_schema()
+"""
 
 """
 # Initialize Database
 create_tables()
-log.info("✅ Database initialized and tables created.")
 """
